@@ -79,17 +79,20 @@ def test(testloader, net, criterion):
     return top1.avg, losses.avg
 
 class IMCEstimator(object):
-    def __init__(self, model, array_size, cellbit, wbit):
+    def __init__(self, model, wbit, hw_specs):
         self.model = model
         self.state_dict = model.state_dict()
 
         # rram property
-        self.array_size = array_size
-        self.col_per_weight = wbit // cellbit
+        self.hw_specs = hw_specs
+        self.array_size = hw_specs["array_size"]
+        self.col_per_weight = wbit // hw_specs["cellbit"]
 
-        assert len(array_size) == 2, "Array size must contains two dims (row, col)"
+        assert len(self.array_size) == 2, "Array size must contains two dims (row, col)"
 
-    def num_array(self):
+    def array_by_layer(self):
+        num_array = {}
+        total_param = 0
         for k, layer in self.model.named_modules():
             if isinstance(layer, nn.Conv2d):
                 weight = layer.weight
@@ -100,4 +103,46 @@ class IMCEstimator(object):
                 n_cols = math.ceil(o / self.array_size[1])*self.col_per_weight
                 n_array = n_rows * n_cols
 
-                
+                num_array[k] = n_array
+                total_param += o*c*kw*kh
+        return num_array, total_param
+    
+    def nops(self, ofm_size, narr, spars):
+        return narr*ofm_size[0]*ofm_size[1]*(1-spars)
+    
+    def cell_energy(self, N, G, V, T):
+        return G*N*(V**2)*T
+    
+    def get_relu_energy(self):
+        pass
+
+    def get_model_energy(self, ofm, logger):
+        arrays, total_param = self.array_by_layer()
+        model_energy = 0
+        for k, v in ofm.items():
+            ops = self.nops(v, arrays[k], 0)
+            import pdb;pdb.set_trace()
+            e = ops*self.hw_specs["energy"]
+            
+            logger.info("Layer: {}, Energy: {}".format(k, e))
+            model_energy += e
+        
+        # return the value in terms of micro juels
+        model_energy = model_energy / 1e6
+        return model_energy
+
+    def get_model_area(self):
+        pass
+
+    def reprogram_energy(self, spars, cell_specs):
+        """
+        Element-wise sparsity for reprogramming
+        """
+        arrays, total_param = self.array_by_layer()
+        sparse_weight = total_param * spars
+        
+        cell_energy = self.cell_energy(cell_specs["NPulse"], cell_specs["R"], cell_specs["wdv"], cell_specs["wdp"])
+        rp_energy = sparse_weight * cell_energy * self.col_per_weight
+        return rp_energy
+    
+    

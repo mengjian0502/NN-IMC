@@ -16,7 +16,29 @@ import torch.utils.model_zoo as model_zoo
 import torchvision
 from torchsummary import summary
 from dataset import get_loader 
-from hw_eval import test
+from hw_eval import test, IMCEstimator
+
+# HW specs
+array_specs = {
+    "cellbit":2,
+    "array_size":[72,72],
+    "energy": 12.79,
+    "latency": 15.54,
+    "area":11180.72
+}
+
+cell_specs = {
+    "NPulse":20,
+    "R": 4e-5,
+    "wiv": 0.9,
+    "wip": 100e-6,
+    "wdv": 1.,
+    "wdp": 100e-6
+}
+
+peripheral_specs = {
+
+}
 
 parser = argparse.ArgumentParser(description='PyTorch CIFAR10/ImageNet evaluation')
 parser.add_argument('--model', type=str, help='model type')
@@ -43,8 +65,10 @@ args = parser.parse_args()
 args.use_cuda = args.ngpu > 0 and torch.cuda.is_available()  # check GPU
 
 activation = {}
-def hook_fn(m, i, o):
-    activation[m] = o 
+def get_activation(name):
+    def hook_fn(m, i, o):
+        activation[name] = list(o.size())
+    return hook_fn
 
 def main():
     if not os.path.isdir(args.save_path):
@@ -79,9 +103,28 @@ def main():
     # register hook
     for name, layer in net.named_modules():
         if isinstance(layer, nn.Conv2d):
-            layer.register_forward_hook(hook_fn)
+            layer.register_forward_hook(get_activation(name))
 
     # run test    
     test_acc, val_loss = test(testloader, net, criterion)
+    logger.info("Test acc = {}".format(test_acc))
+
+    # hw eval
+    est = IMCEstimator(net, wbit=4, hw_specs=array_specs)
     
+    # inference energy
+    model_energy = est.get_model_energy(activation, logger)
+    logger.info("\nInference energy per image = {} uJ".format(model_energy))
+    energy_per_val_set = model_energy * len(testloader)
+    logger.info("({}) Inference energy per val set = {} uJ; size = {}".format(args.dataset, energy_per_val_set, len(testloader)))
+    
+    # reprogram energy
+    sparsity = 30.47/100
+    rp_energy = est.reprogram_energy(spars=sparsity, cell_specs=cell_specs)
+    rp_energy = rp_energy*10**6
+    logger.info("Reprogramming energy = {}uJ".format(rp_energy))
+    logger.info("Reprogramming / Inference = {}%".format(rp_energy/energy_per_val_set*100))
+
+if __name__ == '__main__':
+    main()
     
