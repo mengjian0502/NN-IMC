@@ -119,11 +119,13 @@ def main():
     logger.info("({}) Inference energy per val set = {} uJ; size = {}".format(args.dataset, energy_per_val_set, len(testloader)))
     
     # reprogram energy
-    sparsity = 30.47/100
+    sparsity = 5/100
     rp_energy = est.reprogram_energy(spars=sparsity, cell_specs=cell_specs)
     rp_energy = rp_energy*10**6
     logger.info("Reprogramming energy = {}uJ".format(rp_energy))
     logger.info("Reprogramming / Inference = {}%".format(rp_energy/energy_per_val_set*100))
+    logger.info("Total / Inference = {}".format((energy_per_val_set + rp_energy)/energy_per_val_set))
+    logger.info("Reprogramming percentage = {}".format(sparsity))
 
 if __name__ == '__main__':
     main()

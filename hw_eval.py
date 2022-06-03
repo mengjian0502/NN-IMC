@@ -121,7 +121,6 @@ class IMCEstimator(object):
         model_energy = 0
         for k, v in ofm.items():
             ops = self.nops(v, arrays[k], 0)
-            import pdb;pdb.set_trace()
             e = ops*self.hw_specs["energy"]
             
             logger.info("Layer: {}, Energy: {}".format(k, e))

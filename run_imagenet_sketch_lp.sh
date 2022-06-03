@@ -1,16 +1,16 @@
-PYTHON="/home/jmeng15/anaconda3/envs/ssd_quant/bin/python"
+PYTHON="/home/jmeng15/anaconda3/bin/python"
 ############ directory to save result #############
 
 if [ ! -d "$DIRECTORY" ]; then
     mkdir ./save
     mkdir ./dataset
 fi
-export CUDA_VISIBLE_DEVICES=1
+export CUDA_VISIBLE_DEVICES=3
 num_runs=6
 model=resnet50
 
-dataset=wikiart
-data_path='/home/jmeng15/imagenet_to_sketch/wikiart'
+dataset=sketches
+data_path='/home/jmeng15/imagenet_to_sketch/sketches'
 # data_path='/opt/imagenet/imagenet_compressed/'
 
 epochs=30
